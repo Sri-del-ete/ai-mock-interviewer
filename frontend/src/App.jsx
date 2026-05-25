@@ -12,10 +12,12 @@ export default function App() {
   const [results, setResults] = useState([]);
   const [loading, setLoading] = useState(false);
   const [stage, setStage] = useState("setup");
+  const [error, setError] = useState("");
 
   const startInterview = async () => {
     if (!role.trim()) return;
     setLoading(true);
+    setError("");
     try {
       const res = await axios.post(`${API}/generate-questions`, { role });
       setQuestions(res.data.questions);
@@ -25,14 +27,16 @@ export default function App() {
       setFeedback(null);
       setAnswer("");
     } catch (e) {
-      alert("Something went wrong. Is your backend running?");
+      setError(e.response?.data?.error || "Something went wrong. Is your backend running?");
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   };
 
   const submitAnswer = async () => {
     if (!answer.trim()) return;
     setLoading(true);
+    setError("");
     try {
       const res = await axios.post(`${API}/evaluate-answer`, {
         role,
@@ -46,9 +50,10 @@ export default function App() {
         ...res.data
       }]);
     } catch (e) {
-      alert("Something went wrong.");
+      setError(e.response?.data?.error || "Something went wrong while evaluating your answer.");
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   };
 
   const nextQuestion = () => {
@@ -69,6 +74,7 @@ export default function App() {
     setFeedback(null);
     setAnswer("");
     setCurrentQ(0);
+    setError("");
   };
 
   const avgScore = results.length
@@ -86,6 +92,12 @@ export default function App() {
           <h1 style={{ fontSize: 26, color: "#1a237e", margin: 0 }}>🎯 AI Mock Interviewer</h1>
           <p style={{ color: "#666", marginTop: 6, fontSize: 14 }}>Practice interviews with real AI feedback</p>
         </div>
+
+        {error && (
+          <div style={{ background: "#ffebee", border: "1px solid #ef9a9a", color: "#b71c1c", borderRadius: 8, padding: "10px 14px", marginBottom: 16, fontSize: 14 }}>
+            {error}
+          </div>
+        )}
 
         {/* SETUP */}
         {stage === "setup" && (
