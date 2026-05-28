@@ -1,7 +1,7 @@
 import { useState } from "react";
 import axios from "axios";
 
-const API = "http://127.0.0.1:5000";
+const API = "https://ai-mock-interviewer-e7u8.onrender.com";
 
 export default function App() {
   const [role, setRole] = useState("");
