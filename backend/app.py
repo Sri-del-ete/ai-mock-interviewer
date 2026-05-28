@@ -4,16 +4,49 @@ from google import genai
 from dotenv import load_dotenv
 import os
 import json
+import time
+from collections import defaultdict, deque
 
 load_dotenv()
 client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
 
 app = Flask(__name__)
-CORS(app)
+
+allowed_origins = [
+    origin.strip()
+    for origin in os.getenv(
+        "ALLOWED_ORIGINS", "http://localhost:5173,http://127.0.0.1:5173"
+    ).split(",")
+    if origin.strip()
+]
+CORS(app, resources={r"/*": {"origins": allowed_origins}})
+
+rate_limit_window_seconds = int(os.getenv("RATE_LIMIT_WINDOW_SECONDS", "60"))
+rate_limit_max_requests = int(os.getenv("RATE_LIMIT_MAX_REQUESTS", "30"))
+request_timestamps = defaultdict(deque)
 
 def parse_model_json(text):
     cleaned = text.strip().replace("```json", "").replace("```", "").strip()
     return json.loads(cleaned)
+
+def is_rate_limited(ip_address):
+    now = time.time()
+    timestamps = request_timestamps[ip_address]
+    while timestamps and (now - timestamps[0]) > rate_limit_window_seconds:
+        timestamps.popleft()
+    if len(timestamps) >= rate_limit_max_requests:
+        return True
+    timestamps.append(now)
+    return False
+
+@app.before_request
+def enforce_rate_limit():
+    if request.method == "OPTIONS":
+        return None
+    ip_address = (request.headers.get("X-Forwarded-For") or request.remote_addr or "unknown").split(",")[0].strip()
+    if is_rate_limited(ip_address):
+        return jsonify({'error': 'Too many requests. Please try again shortly.'}), 429
+    return None
 
 @app.route('/generate-questions', methods=['POST'])
 def generate_questions():
